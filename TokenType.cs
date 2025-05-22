@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,7 @@ namespace kompilator
         OPERATOR,   // Оператор (+, -, :=)
         COLON,      // Двоеточие (:)
         SEMICOLON,  // Точка с запятой (;)
-        UNKNOWN     // Неизвестный символ
+        UNKNOWN ,    // Неизвестный символ
+        NEWLINE
     }
 }
