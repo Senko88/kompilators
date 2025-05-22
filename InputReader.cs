@@ -1,55 +1,51 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 
-namespace kompilator
+// InputReader.cs
+public class InputReader
 {
-    public class InputReader
+    public int CurrentLine { get; private set; } = 1;
+    public int CurrentColumn { get; private set; } = 1;
+    private readonly StringReader _reader;
+    private int _line = 1, _column = 1;
+    private char _currentChar;
+
+    public InputReader(string sourceCode)
     {
-        private StreamReader _file;
-        private int _line = 1, _column = 1;
-        private char _currentChar;
+        _reader = new StringReader(sourceCode);
+        _currentChar = (char)_reader.Read();
+    }
 
-        public InputReader(string filePath)
+    public char NextChar()
+    {
+        char c = _currentChar;
+        if (_reader.Peek() == -1)
         {
-            _file = new StreamReader(filePath);
-            _currentChar = (char)_file.Read(); // Первый символ
+            _currentChar = '\0';
         }
-
-        // 🎀 nextch — читает следующий символ (двигает "каретку")
-        public char NextChar()
+        else
         {
-            char c = _currentChar;
-            if (_file.EndOfStream)
+            _currentChar = (char)_reader.Read();
+            _column++;
+            if (c == '\n')
             {
-                _currentChar = '\0'; // Конец файла
+                _line++;
+                _column = 1;
             }
-            else
-            {
-                _currentChar = (char)_file.Read();
-                _column++;
-                if (c == '\n')
-                {
-                    _line++;
-                    _column = 1;
-                }
-            }
-            return c;
         }
+        return c;
+    }
 
-        // 🍯 Peek — подглядывает символ (не двигая позицию)
-        public char Peek()
-        {
-            return _currentChar;
-        }
+    public char Peek() => _currentChar;
 
-        // 🧧 Запись ошибки (для таблицы ошибок из задания 0)
-        public void LogError(string message)
-        {
-            Console.WriteLine($"Ошибка в строке {_line}, столбец {_column}: {message}");
-        }
+    public void LogError(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine(message);
+        Console.ResetColor();
     }
 }
