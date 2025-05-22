@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 
 namespace kompilator
 {
@@ -8,31 +9,57 @@ namespace kompilator
         {
             try
             {
-                var reader = new InputReader(@"C:\My_pask\programm.pas");
-                var lexer = new Lexer(reader);
+                string filePath = "program.pas";
 
-                // Вывод всех токенов
-                Console.WriteLine("=== Список токенов ===");
-                Token token;
-                do
+                if (!File.Exists(filePath))
                 {
-                    token = lexer.NextToken();
-                    Console.WriteLine($"{token.Type}: '{token.Value}'");
-                } while (token.Type != TokenType.EOF);
+                    ShowError($"Файл не найден: {filePath}");
+                    Console.WriteLine("Создайте файл program.pas в папке:");
+                    Console.WriteLine(AppDomain.CurrentDomain.BaseDirectory);
+                    return;
+                }
 
-                // Заново инициализируем лексер и парсер
-                reader = new InputReader(@"C:\My_pask\programm.pas");
-                lexer = new Lexer(reader);
-                var parser = new Parser(lexer);
+                string sourceCode = File.ReadAllText(filePath);
+                Console.WriteLine("=== Исходный код ===");
+                Console.WriteLine(sourceCode);
+
+                var parser = new Parser(new Lexer(new InputReader(sourceCode)));
                 parser.ParseProgram();
-                Console.WriteLine("✅ Успешная компиляция!");
+
+                ShowSuccess("Программа корректна!");
+                PrintTokens(sourceCode);
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Ошибка: {ex.Message}");
-                Console.ResetColor();
+                ShowError(ex.Message);
             }
+        }
+
+        // Вспомогательные методы
+        private static void ShowError(string message)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"\nОШИБКА: {message}");
+            Console.ResetColor();
+        }
+
+        private static void ShowSuccess(string message)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"\n{message}");
+            Console.ResetColor();
+        }
+
+        private static void PrintTokens(string code)
+        {
+            Console.WriteLine("\nТокены:");
+            var lexer = new Lexer(new InputReader(code));
+            Token token;
+            do
+            {
+                token = lexer.NextToken();
+                Console.WriteLine($"{token.Type}: {token.Value}");
+            } while (token.Type != TokenType.EOF);
         }
     }
 }
