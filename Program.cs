@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 
 namespace kompilator
@@ -27,6 +27,11 @@ namespace kompilator
                 parser.ParseProgram();
 
                 ShowSuccess("Программа корректна!");
+                Console.WriteLine("\n=== Ключевые слова компилятора ===");
+                PrintKeyWords();
+
+                var parser2 = new Parser(new Lexer(new InputReader(sourceCode)));
+                parser2.ParseProgram();
                 PrintTokens(sourceCode);
             }
             catch (Exception ex)
@@ -35,6 +40,16 @@ namespace kompilator
             }
         }
 
+        private static void PrintKeyWords()
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("\nСловарь лексера:");
+            foreach (var kw in new Lexer(null)._keywords)
+            {
+                Console.WriteLine($"{kw.Value}");
+            }
+            Console.ResetColor();
+        }
         // Вспомогательные методы
         private static void ShowError(string message)
         {
@@ -49,7 +64,8 @@ namespace kompilator
             Console.WriteLine($"\n{message}");
             Console.ResetColor();
         }
-
+        
+        
         private static void PrintTokens(string code)
         {
             Console.WriteLine("\nТокены:");
