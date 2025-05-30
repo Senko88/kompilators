@@ -44,10 +44,7 @@ namespace kompilator
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("\nСловарь лексера:");
-            foreach (var kw in new Lexer(null)._keywords)
-            {
-                Console.WriteLine($"{kw.Value}");
-            }
+            Console.WriteLine(Lexer.GetAllTokenCodes());
             Console.ResetColor();
         }
         // Вспомогательные методы
@@ -64,8 +61,8 @@ namespace kompilator
             Console.WriteLine($"\n{message}");
             Console.ResetColor();
         }
-        
-        
+
+
         private static void PrintTokens(string code)
         {
             Console.WriteLine("\nТокены:");
