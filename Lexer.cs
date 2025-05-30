@@ -3,6 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Globalization;
 
 namespace kompilator
@@ -12,7 +18,40 @@ namespace kompilator
     {
         private readonly InputReader _reader;
         private readonly SemanticAnalyzer _semanticAnalyzer; // Добавляем поле
+        private int _currentLine = 1; // Добавляем отслеживание строки
+        private void ThrowError(int code, params object[] args)
+        {
+            // Формируем сообщение
+            string message = $"Строка {_currentLine}: Ошибка {code}: {string.Format(ErrorCodes[code], args)}";
 
+            // Вывод в консоль
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(message);
+            Console.ResetColor();
+
+            // Завершаем программу с кодом ошибки
+            Environment.Exit(code);
+        }
+        public static readonly Dictionary<int, string> ErrorCodes = new Dictionary<int, string>
+        {
+            {100, "Отсутствует ;"},
+            {101, "Отсутствует . после end"},
+            {102, "Неверный тип данных"},
+            {103, "Неизвестный символ: {0}"},
+            {104, "Ожидалось {0}, но получено {1}"},
+            {105, "Неизвестный оператор"},
+            {106, "Переменная '{0}' не объявлена"},
+            {107, "Отсутствует begin"},
+            {108, "Отсутствует end"},
+            {109, "Отсутствует :="},
+            {110, "Отсутствует '('"},
+            {111, "Отсутствует ')'"},
+            {112, "Несоответствие типов"},
+            {113, "Дублирование идентификатора '{0}'"},
+            {114, "Выход за границы массива"},
+            {115, "Неверное количество параметров"}
+            // ... добавь остальные из твоего списка
+        };
         public static readonly Dictionary<string, int> TokenCodes = new()
         {
             // Специальные символы и операторы
@@ -101,65 +140,8 @@ namespace kompilator
             _reader = reader;
             _semanticAnalyzer = new SemanticAnalyzer(); // Инициализируем анализатор
         }
-        private Token ParseNumber()
-        {
-            string numStr = "";
-            bool hasDot = false;
-            bool hasExponent = false;
-
-            // Собираем все цифры, точки и знаки экспоненты
-            while (char.IsDigit(_reader.Peek()) ||
-                   _reader.Peek() == '.' ||
-                   char.ToLower(_reader.Peek()) == 'e')
-            {
-                char current = _reader.Peek();
-
-                if (current == '.')
-                {
-                    if (hasDot) throw new Exception("Две точки в числе");
-                    hasDot = true;
-                }
-                else if (char.ToLower(current) == 'e')
-                {
-                    if (hasExponent) throw new Exception("Две экспоненты в числе");
-                    hasExponent = true;
-                    numStr += _reader.NextChar();
-
-                    // Обрабатываем знак после экспоненты
-                    if (_reader.Peek() == '+' || _reader.Peek() == '-')
-                    {
-                        numStr += _reader.NextChar();
-                    }
-                    continue;
-                }
-
-                numStr += _reader.NextChar();
-            }
-
-            try
-            {
-                if (hasDot || hasExponent)
-                {
-                    double value = double.Parse(numStr, CultureInfo.InvariantCulture);
-                    _semanticAnalyzer.CheckRealRange(value);
-                    return new Token(TokenType.NUMBER, numStr, TokenCodes["floatc"]);
-                }
-                else
-                {
-                    int value = int.Parse(numStr);
-                    _semanticAnalyzer.CheckIntegerRange(value);
-                    return new Token(TokenType.NUMBER, numStr, TokenCodes["intc"]);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"ОШИБКА в строке {_reader.CurrentLine}: {ex.Message}");
-                Console.ResetColor();
-                Environment.Exit(1);
-                return new Token(TokenType.UNKNOWN, numStr, -1);
-            }
-        }
+  
+        
         public Token NextToken()
         {
 
@@ -217,7 +199,3 @@ namespace kompilator
         }
     }
     }
-
-
-
-
