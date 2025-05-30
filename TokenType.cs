@@ -10,7 +10,7 @@ namespace kompilator
     {
         EOF,        // Конец файла
         KEYWORD,    // Ключевое слово (program, var)
-        ID,         // Идентификатор (x, y)
+        IDENT,         // Идентификатор (x, y)
         NUMBER,     // Число (42, 3.14)
         OPERATOR,   // Оператор (+, -, :=)
         COLON,      // Двоеточие (:)
