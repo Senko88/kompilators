@@ -9,11 +9,10 @@ namespace kompilator
 
     public class SemanticAnalyzer
     {
-        private const int IntegerMin = -2147483648;  // Минимальное значение для integer (32-бит)
-        private const int IntegerMax = 2147483647;   // Максимальное значение для integer
+        private const int IntegerMin = -32768;  // Минимальное значение для integer (32-бит)
+        private const int IntegerMax = 32767;   // Максимальное значение для integer
         private const double RealMin = -1.7e308;
         private const double RealMax = 1.7e308;
-        private const double RealDemoLimit = 1.0e20; // Искусственное ограничение для демонстрации
         private Dictionary<string, string> _symbols = new Dictionary<string, string>();
 
         public void CheckAssignment(string id, string type, string valueStr)
@@ -50,16 +49,14 @@ namespace kompilator
         public void CheckIntegerRange(int value)
         {
             if (value < IntegerMin || value > IntegerMax)
-                throw new Exception($"Ошибка: целое число {value} вне диапазона [{IntegerMin}, {IntegerMax}]");
+            {
+                throw new Exception($"Ошибка 102: {value} вне диапазона [{IntegerMin}, {IntegerMax}]");
+            }
         }
 
         public void CheckRealRange(double value)
         {
-            if (value < -RealDemoLimit || value > RealDemoLimit)
-            {
-                throw new Exception($"Вещественное число {value} превышает допустимый диапазон [{-RealDemoLimit}, {RealDemoLimit}]");
-            }
-
+            
             // Стандартная проверка (оставьте на будущее)
             if (value < RealMin || value > RealMax)
             {
