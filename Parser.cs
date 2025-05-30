@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-
+using System.Globalization;
 namespace kompilator
 {
     public class Parser
@@ -12,6 +12,7 @@ namespace kompilator
         private readonly Random _random = new Random();
         private readonly Lexer _lexer;
         private Token _currentToken;
+        private readonly SemanticAnalyzer _semanticAnalyzer;
         private int _currentLine = 1;
 
         // Список возможных ошибок (код → сообщение)
@@ -52,6 +53,7 @@ namespace kompilator
         {
             _lexer = lexer;
             _currentToken = _lexer.NextToken();
+            _semanticAnalyzer = new SemanticAnalyzer();
         }
         private int GetApproximateLine()
         {
@@ -89,6 +91,7 @@ namespace kompilator
                 throw new Exception($"Ошибка {errorCode}: {errorMsg}");
             }
         }
+
         private void ParseBlock()
         {
             _currentToken = _lexer.NextToken(); // Пропускаем 'begin'
@@ -115,7 +118,7 @@ namespace kompilator
                 }
                 _currentToken = _lexer.NextToken(); // Пропускаем 'program'
 
-                if (_currentToken.Type != TokenType.ID)
+                if (_currentToken.Type != TokenType.IDENT)
                 {
                     ThrowError(100, "идентификатор программы");
                 }
@@ -132,7 +135,7 @@ namespace kompilator
                 {
                     _currentToken = _lexer.NextToken(); // Пропускаем 'var'
 
-                    while (_currentToken.Type == TokenType.ID)
+                    while (_currentToken.Type == TokenType.IDENT)
                     {
                         // Обрабатываем объявление переменной
                         string varName = _currentToken.Value;
@@ -196,11 +199,11 @@ namespace kompilator
                 Eat(TokenType.KEYWORD, "var");
 
                 // Обрабатываем все объявления переменных
-                while (_currentToken.Type == TokenType.ID)
+                while (_currentToken.Type == TokenType.IDENT)
                 {
                     // Объявление одной переменной
                     string varName = _currentToken.Value;
-                    Eat(TokenType.ID); // x
+                    Eat(TokenType.IDENT); // x
                     Eat(TokenType.OPERATOR, ":"); // :
                     Eat(TokenType.KEYWORD, "integer"); // integer
                     Eat(TokenType.OPERATOR, ";"); // ;
@@ -209,7 +212,63 @@ namespace kompilator
                 }
             }
         }
+        private void ParseVarDeclaration()
+        {
+            Eat(TokenType.KEYWORD, "var");
 
+            while (_currentToken.Type == TokenType.IDENT)
+            {
+                string varName = _currentToken.Value;
+                Eat(TokenType.IDENT);
+                Eat(TokenType.OPERATOR, ":");
+
+                string typeName = _currentToken.Value;
+                Eat(TokenType.KEYWORD); // "integer" или "real"
+
+                // Добавляем переменную в таблицу символов
+                _symbols.Add(varName, typeName.ToLower());
+
+                Eat(TokenType.OPERATOR, ";");
+            }
+        }
+        private void ParseAssignment()
+        {
+            string varName = _currentToken.Value;
+            Eat(TokenType.IDENT);
+            Eat(TokenType.OPERATOR, ":=");
+
+            // Сохраняем значение для проверки
+            string value = _currentToken.Value;
+
+            // Проверяем тип и диапазон
+            if (_symbols.TryGetValue(varName, out string varType))
+            {
+                try
+                {
+                    if (varType == "real")
+                    {
+                        double realValue = double.Parse(value, CultureInfo.InvariantCulture);
+                        _semanticAnalyzer.CheckRealRange(realValue);
+                    }
+                    else if (varType == "integer")
+                    {
+                        int intValue = int.Parse(value);
+                        _semanticAnalyzer.CheckIntegerRange(intValue);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ThrowError(102, ex.Message); // Код 102 - ошибка типа данных
+                }
+            }
+            else
+            {
+                ThrowError(106, varName); // Код 106 - переменная не объявлена
+            }
+
+            _currentToken = _lexer.NextToken();
+            Eat(TokenType.OPERATOR, ";");
+        }
         private void ParseStatements()
         {
             while (_currentToken.Value != "end")
