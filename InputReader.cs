@@ -10,38 +10,48 @@ public class InputReader
 {
     public int CurrentLine { get; private set; } = 1;
     public int CurrentColumn { get; private set; } = 1;
+
     private readonly StringReader _reader;
-    private int _line = 1, _column = 1;
     private char _currentChar;
 
     public InputReader(string sourceCode)
     {
         _reader = new StringReader(sourceCode);
-        _currentChar = (char)_reader.Read();
+        _currentChar = (char)_reader.Read(); // Инициализируем первый символ
     }
 
     public char NextChar()
     {
         char c = _currentChar;
-        if (_reader.Peek() == -1)
+
+        // Читаем следующий символ
+        int next = _reader.Read();
+        _currentChar = next == -1 ? '\0' : (char)next;
+
+        // Обновляем позицию
+        if (c == '\n')
         {
-            _currentChar = '\0';
+            CurrentLine++;
+            CurrentColumn = 1;
         }
         else
         {
-            _currentChar = (char)_reader.Read();
-            _column++;
-            if (c == '\n')
-            {
-                _line++;
-                _column = 1;
-            }
+            CurrentColumn++;
         }
+
         return c;
     }
 
-    public char Peek() => _currentChar;
+    public char Peek()
+    {
+        return _currentChar;
+    }
 
+    public char PeekNext()
+    {
+        int next = _reader.Peek();
+        return next == -1 ? '\0' : (char)next;
+    }
     public void LogError(string message)
     {
         Console.ForegroundColor = ConsoleColor.Red;
