@@ -140,18 +140,21 @@ namespace kompilator
             _reader = reader;
             _semanticAnalyzer = new SemanticAnalyzer(); // Инициализируем анализатор
         }
-  
-        
+
+
         public Token NextToken()
         {
-
             while (char.IsWhiteSpace(_reader.Peek()))
                 _reader.NextChar();
 
             char c = _reader.Peek();
             if (c == '\0') return new Token(TokenType.EOF, "", 0);
-
-            // 1. Если буква — это IDENT или KEYWORD
+            if (c == '.' && !char.IsDigit(_reader.PeekNext()))
+            {
+                _reader.NextChar(); // Пропускаем точку
+                return new Token(TokenType.OPERATOR, ".", TokenCodes["."]);
+            }
+            // 1. Если буква — IDENT или KEYWORD
             if (char.IsLetter(c))
             {
                 string word = "";
@@ -162,40 +165,83 @@ namespace kompilator
                 return new Token(code == 2 ? TokenType.IDENT : TokenType.KEYWORD, word, code);
             }
 
-            // 2. Если цифра — это NUMBER
-            if (char.IsDigit(c))
+            // 2. Если цифра или точка (NUMBER, в том числе real)
+            if (char.IsDigit(c) || c == '.')
             {
                 string numStr = "";
-                while (char.IsDigit(_reader.Peek()))
-                    numStr += _reader.NextChar();
+                bool hasDot = false;
+                bool hasExponent = false;
 
-                try
+                // Читаем цифры и точку
+                while (char.IsDigit(_reader.Peek()) || _reader.Peek() == '.')
                 {
-                    int value = int.Parse(numStr);
-                    _semanticAnalyzer.CheckIntegerRange(value);
-                    return new Token(TokenType.NUMBER, numStr, TokenCodes["intc"]);
+                    char nextChar = _reader.Peek();
+                    if (nextChar == '.')
+                    {
+                        if (hasDot) break; // Уже была точка — выходим
+                        hasDot = true;
+                    }
+                    numStr += _reader.NextChar();
                 }
-                catch (Exception ex)
+
+                // Проверяем экспоненту (e/E)
+                if (_reader.Peek() == 'e' || _reader.Peek() == 'E')
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"ОШИБКА в строке {_reader.CurrentLine}: {ex.Message}");
-                    Console.ResetColor();
-                    // Можно либо продолжить работу, либо завершить программу
-                    Environment.Exit(1);
+                    numStr += _reader.NextChar(); // Добавляем 'e'
+                    hasExponent = true;
+
+                    // Обрабатываем знак (+/-)
+                    if (_reader.Peek() == '+' || _reader.Peek() == '-')
+                    {
+                        numStr += _reader.NextChar();
+                    }
+
+                    // Читаем цифры экспоненты
+                    while (char.IsDigit(_reader.Peek()))
+                    {
+                        numStr += _reader.NextChar();
+                    }
+                }
+
+                // Проверяем, что это число (а не просто точка или 'e')
+                if (numStr.Length > 0 && (char.IsDigit(numStr[0]) || numStr.StartsWith(".") && numStr.Length > 1))
+                {
+                    if (hasDot || hasExponent)
+                    {
+                        if (!double.TryParse(numStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double realValue))
+                        {
+                            ThrowError(102, $"Некорректное вещественное число: {numStr}");
+                        }
+
+                        // Проверяем диапазон для вещественных чисел
+                        _semanticAnalyzer.CheckRealRange(realValue);
+
+                        return new Token(TokenType.NUMBER, numStr, TokenCodes["floatc"]);
+                    }
+                    else
+                    {
+                        if (!int.TryParse(numStr, out int intValue))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine($"⚠ Предупреждение: '{numStr}' — слишком большое целое число");
+                            Console.ResetColor();
+                        }
+                        else
+                        {
+                            _semanticAnalyzer.CheckIntegerRange(intValue);
+                        }
+                        return new Token(TokenType.NUMBER, numStr, TokenCodes["intc"]);
+                    }
                 }
             }
 
             // 3. Если символ — OPERATOR/PUNCT
             string op = _reader.NextChar().ToString();
-            // Проверка многосимвольных операторов (:=, <= и т.д.)
             if (TokenCodes.ContainsKey(op + _reader.Peek()))
             {
                 op += _reader.NextChar();
             }
             return new Token(TokenType.OPERATOR, op, GetTokenCode(op));
-        
-
-   
         }
     }
-    }
+}
