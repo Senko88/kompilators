@@ -9,59 +9,95 @@ namespace kompilator
 
     public class SemanticAnalyzer
     {
-        private const int IntegerMin = -32768;  // Минимальное значение для integer (32-бит)
-        private const int IntegerMax = 32767;   // Максимальное значение для integer
-        private const double RealMin = -1.7e308;
-        private const double RealMax = 1.7e308;
+
         private Dictionary<string, string> _symbols = new Dictionary<string, string>();
 
-        public void CheckAssignment(string id, string type, string valueStr)
+        // Проверка диапазона для целых чисел (возвращает false, если вне диапазона)
+
+        // Проверка диапазона для вещественных чисел
+
+        public bool CheckRealRange(double value)
         {
-            if (!_symbols.ContainsKey(id))
-                throw new Exception($"Переменная '{id}' не объявлена");
+            const double RealMin = -1.7976931348623157E+308;
+            const double RealMax = 1.7976931348623157E+308;
 
-            bool isReal = _symbols[id] == "real";
-            bool isInteger = _symbols[id] == "integer";
+            if (double.IsInfinity(value))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Ошибка 102: Число слишком большое (Infinity)");
+                Console.ResetColor();
+                return false;
+            }
 
-            try
+            if (value < RealMin || value > RealMax)
             {
-                if (isReal)
-                {
-                    double value = double.Parse(valueStr, CultureInfo.InvariantCulture);
-                    CheckRealRange(value); // Проверка диапазона
-                }
-                else if (isInteger)
-                {
-                    int value = int.Parse(valueStr);
-                    CheckIntegerRange(value);
-                }
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Ошибка 102: Число {value.ToString("G17", CultureInfo.InvariantCulture)} вне диапазона real [{RealMin.ToString("G17", CultureInfo.InvariantCulture)}, {RealMax.ToString("G17", CultureInfo.InvariantCulture)}]");
+                Console.ResetColor();
+                return false;
             }
-            catch (FormatException)
-            {
-                throw new Exception($"Неверный формат числа: {valueStr}");
-            }
+            return true;
         }
 
+
+        public bool CheckIntegerRange(long value)
+        {
+            const int IntegerMin = -32768;
+            const int IntegerMax = 32767;
+
+            if (value < IntegerMin || value > IntegerMax)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"Предупреждение: число {value} вне диапазона integer [{IntegerMin}, {IntegerMax}]");
+                Console.ResetColor();
+                return false;
+            }
+            return true;
+        }
+
+        // Добавление переменной в таблицу символов
         public void AddVariable(string id, string type)
         {
             _symbols[id] = type;
         }
-        public void CheckIntegerRange(int value)
-        {
-            if (value < IntegerMin || value > IntegerMax)
-            {
-                throw new Exception($"Ошибка 102: {value} вне диапазона [{IntegerMin}, {IntegerMax}]");
-            }
-        }
 
-        public void CheckRealRange(double value)
+        // Проверка типа при присваивании
+        public bool CheckAssignment(string id, string valueStr)
         {
-            
-            // Стандартная проверка (оставьте на будущее)
-            if (value < RealMin || value > RealMax)
+            if (!_symbols.ContainsKey(id))
             {
-                throw new Exception($"Вещественное число {value} вне диапазона IEEE 754 double [{RealMin}, {RealMax}]");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Ошибка: переменная '{id}' не объявлена");
+                Console.ResetColor();
+                return false;
             }
+
+            string type = _symbols[id];
+            if (type == "integer")
+            {
+                // Исправлено: TryParse вместо IryParse
+                if (!long.TryParse(valueStr, out long intValue))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Ошибка: '{valueStr}' не является целым числом");
+                    Console.ResetColor();
+                    return false;
+                }
+                return CheckIntegerRange(intValue);
+            }
+            else if (type == "real")
+            {
+                // Исправлено: TryParse и realValue вместо realValve
+                if (!double.TryParse(valueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double realValue))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"Ошибка: '{valueStr}' не является вещественным числом");
+                    Console.ResetColor();
+                    return false;
+                }
+                return CheckRealRange(realValue);
+            }
+            return true;
         }
     }
 }
