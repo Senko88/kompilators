@@ -1,6 +1,6 @@
-program HelloWorld;
-var 
-  x: integer;
+program test;
+var r: real;
 begin
-  x := 42;
+    r := 1.8e308; 
 end.
+
