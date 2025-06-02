@@ -147,11 +147,12 @@ namespace kompilator
                         }
                         _currentToken = _lexer.NextToken(); // Пропускаем :
 
-                        if (_currentToken.Value != "integer")
+                        if (_currentToken.Value != "integer" && _currentToken.Value != "real")
                         {
-                            ThrowError(102);
+                            ThrowError(102); // Неверный тип данных
                         }
                         _currentToken = _lexer.NextToken(); // Пропускаем 'integer'
+                       
 
                         if (_currentToken.Value != ";")
                         {
@@ -181,6 +182,7 @@ namespace kompilator
                 {
                     ThrowError(101); // Отсутствует .
                 }
+
             }
             catch (Exception ex)
             {
@@ -243,31 +245,40 @@ namespace kompilator
             if (!_symbols.ContainsKey(varName))
             {
                 ThrowError(106, varName); // Переменная не объявлена
+                return;
             }
+
+            string varType = _symbols[varName];
             Eat(TokenType.IDENT);
             Eat(TokenType.OPERATOR, ":=");
 
-            // Обрабатываем число (целое или вещественное)
             if (_currentToken.Type == TokenType.NUMBER)
             {
                 string value = _currentToken.Value;
-                try
+
+                if (varType == "integer")
                 {
-                    if (_symbols[varName] == "integer")
+                    if (!long.TryParse(value, out long intValue))
                     {
-                        int intValue = int.Parse(value);
-                        _semanticAnalyzer.CheckIntegerRange(intValue);
+                        ThrowError(102, $"Некорректный формат целого числа: {value}");
                     }
-                    else if (_symbols[varName] == "real")
+                    else if (!_semanticAnalyzer.CheckIntegerRange(intValue))
                     {
-                        double realValue = double.Parse(value, CultureInfo.InvariantCulture);
-                        _semanticAnalyzer.CheckRealRange(realValue);
+                        ThrowError(102, $"Число {value} вне диапазона integer");
                     }
                 }
-                catch (Exception ex)
+                else if (varType == "real")
                 {
-                    ThrowError(102, ex.Message); // Ошибка типа данных
+                    if (!double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double realValue))
+                    {
+                        ThrowError(102, $"Некорректный формат вещественного числа: {value}");
+                    }
+                    else if (!_semanticAnalyzer.CheckRealRange(realValue))
+                    {
+                        ThrowError(102, $"Число {value} вне диапазона real");
+                    }
                 }
+
                 Eat(TokenType.NUMBER);
             }
             else
@@ -277,6 +288,7 @@ namespace kompilator
 
             Eat(TokenType.OPERATOR, ";");
         }
+
         private void ParseStatements()
         {
             while (_currentToken.Value != "end")
@@ -289,5 +301,4 @@ namespace kompilator
             }
         }
     }
-    }
-
+}
