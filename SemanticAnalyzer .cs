@@ -9,7 +9,7 @@ namespace kompilator
 
     public class SemanticAnalyzer
     {
-
+        public List<string> Errors { get; } = new List<string>(); // Новое поле для ошибок
         private Dictionary<string, string> _symbols = new Dictionary<string, string>();
 
         // Проверка диапазона для целых чисел (возвращает false, если вне диапазона)
