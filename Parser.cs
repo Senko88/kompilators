@@ -9,6 +9,7 @@ namespace kompilator
 {
     public class Parser
     {
+        public List<string> Errors { get; } = new List<string>(); // Новое поле для ошибок
         private readonly Random _random = new Random();
         private readonly Lexer _lexer;
         private Token _currentToken;
@@ -38,22 +39,17 @@ namespace kompilator
     };
         private void ThrowError(int code, params object[] args)
         {
-            // Формируем сообщение
             string message = $"Строка {_currentLine}: Ошибка {code}: {string.Format(ErrorCodes[code], args)}";
-
-            // Вывод в консоль
+            Errors.Add(message); // Добавляем ошибку в список
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine(message);
+            Console.WriteLine(message); // Выводим сразу (опционально)
             Console.ResetColor();
-
-            // Завершаем программу с кодом ошибки
-            //Environment.Exit(code);
         }
-        public Parser(Lexer lexer)
+        public Parser(Lexer lexer, SemanticAnalyzer semanticAnalyzer)
         {
             _lexer = lexer;
             _currentToken = _lexer.NextToken();
-            _semanticAnalyzer = new SemanticAnalyzer();
+            _semanticAnalyzer = semanticAnalyzer; // Принимаем извне
         }
         private int GetApproximateLine()
         {
