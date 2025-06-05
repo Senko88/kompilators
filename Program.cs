@@ -1,6 +1,8 @@
 using System;
 using System.IO;
-
+using System.Collections.Generic;
+using System.Globalization; 
+using kompilator; 
 namespace kompilator
 {
     class Program
@@ -23,16 +25,46 @@ namespace kompilator
                 Console.WriteLine("=== Исходный код ===");
                 Console.WriteLine(sourceCode);
 
-                var parser = new Parser(new Lexer(new InputReader(sourceCode)));
+                var lexer = new Lexer(new InputReader(sourceCode));
+                var semanticAnalyzer = new SemanticAnalyzer(); // Создаём анализатор здесь
+                var parser = new Parser(lexer, semanticAnalyzer); // Передаём в парсер
                 parser.ParseProgram();
 
-                ShowSuccess("Программа корректна!");
-                Console.WriteLine("\n=== Ключевые слова компилятора ===");
-                PrintKeyWords();
+                // Собираем ошибки из всех источников
+                var allErrors = new List<string>();
+                allErrors.AddRange(lexer.Errors);
+                allErrors.AddRange(parser.Errors);
+                allErrors.AddRange(semanticAnalyzer.Errors); // Добавляем семантические ошибки
 
-                var parser2 = new Parser(new Lexer(new InputReader(sourceCode)));
-                parser2.ParseProgram();
-                PrintTokens(sourceCode);
+                // Вывод ошибок
+                if (allErrors.Count > 0)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("\n=== НАЙДЕНЫ ОШИБКИ ===");
+                    Console.WriteLine($"\nВсего ошибок: {allErrors.Count}");
+                    Console.ResetColor();
+                
+                ShowError("В программе ошибки!!!");
+                    Console.WriteLine("\n=== Ключевые слова компилятора ===");
+                    PrintKeyWords();
+
+                    var parser2 = new Parser(new Lexer(new InputReader(sourceCode)), new SemanticAnalyzer());
+                    parser2.ParseProgram();
+                    PrintTokens(sourceCode);
+                }
+                else
+                {
+                    ShowSuccess("Программа корректна!");
+                    Console.WriteLine("\n=== Ключевые слова компилятора ===");
+                    PrintKeyWords();
+
+                    var parser3 = new Parser(new Lexer(new InputReader(sourceCode)), new SemanticAnalyzer());
+                    parser3.ParseProgram();
+                    PrintTokens(sourceCode);
+                }
+
+                
+ 
             }
             catch (Exception ex)
             {
