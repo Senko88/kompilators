@@ -16,8 +16,9 @@ namespace kompilator
     // Lexer.cs
     public class Lexer
     {
+        public List<string> Errors { get; } = new List<string>(); // Новое поле для ошибок
         private readonly InputReader _reader;
-        private readonly SemanticAnalyzer _semanticAnalyzer; // Добавляем поле
+        private Parser _parser;
         private int _currentLine = 1; // Добавляем отслеживание строки
         private void ThrowError(int code, params object[] args)
         {
@@ -135,10 +136,16 @@ namespace kompilator
         }
 
 
-        public Lexer(InputReader reader)
+        public Lexer(InputReader reader, Parser parser = null)
         {
             _reader = reader;
-            _semanticAnalyzer = new SemanticAnalyzer(); // Инициализируем анализатор
+            _parser = parser;
+        }
+
+        // Метод для позднего связывания
+        public void SetParser(Parser parser)
+        {
+            _parser = parser;
         }
 
 
@@ -149,7 +156,7 @@ namespace kompilator
 
             char c = _reader.Peek();
             if (c == '\0') return new Token(TokenType.EOF, "", 0);
-            if (c == '.' && !char.IsDigit(_reader.PeekNext()))
+            if (c == '.' && !char.IsDigit(_reader.NextChar()))
             {
                 _reader.NextChar(); // Пропускаем точку
                 return new Token(TokenType.OPERATOR, ".", TokenCodes["."]);
@@ -214,7 +221,7 @@ namespace kompilator
                         }
 
                         // Проверяем диапазон для вещественных чисел
-                        _semanticAnalyzer.CheckRealRange(realValue);
+                        _parser.CheckRealRange(realValue);
 
                         return new Token(TokenType.NUMBER, numStr, TokenCodes["floatc"]);
                     }
@@ -228,7 +235,7 @@ namespace kompilator
                         }
                         else
                         {
-                            _semanticAnalyzer.CheckIntegerRange(intValue);
+                            _parser.CheckIntegerRange(intValue);
                         }
                         return new Token(TokenType.NUMBER, numStr, TokenCodes["intc"]);
                     }
