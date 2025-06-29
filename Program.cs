@@ -26,7 +26,8 @@ namespace kompilator
                 Console.WriteLine(sourceCode);
 
                 var lexer = new Lexer(new InputReader(sourceCode));
-                var parser = new Parser(lexer); // Передаём в парсер
+                var semanticAnalyzer = new SemanticAnalyzer(); // Создаём анализатор здесь
+                var parser = new Parser(lexer, semanticAnalyzer); // Передаём в парсер
                 parser.ParseProgram();
 
                 // Собираем ошибки из всех источников
@@ -39,10 +40,10 @@ namespace kompilator
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("\n=== НАЙДЕНЫ ОШИБКИ ===");
-                        Console.WriteLine($"\nВсего ошибок: {allErrors.Count}");
+                    Console.WriteLine($"\nВсего ошибок: {allErrors.Count}");
                     Console.ResetColor();
-                
-                ShowError("В программе ошибки!!!");
+
+                    ShowError("В программе ошибки!!!");
                     Console.WriteLine("\n=== Ключевые слова компилятора ===");
                     PrintKeyWords();
 
@@ -58,8 +59,8 @@ namespace kompilator
                     PrintTokens(sourceCode);
                 }
 
-                
- 
+
+
             }
             catch (Exception ex)
             {
