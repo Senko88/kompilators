@@ -1,3 +1,5 @@
+
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,168 +9,347 @@ using System.Globalization;
 
 namespace kompilator
 {
-    public class SemanticAnalyzer
+    // Lexer.cs
+    public class Lexer
     {
         public List<string> Errors { get; } = new List<string>();
-        private readonly Lexer _lexer;
-        // Таблица символов: имя → (тип, является ли функцией)
-        private Dictionary<string, (string type, bool isFunction)> _symbols = new Dictionary<string, (string, bool)>();
-
-        // Таблица функций: имя → (возвращаемый тип, список параметров)
-        private Dictionary<string, (string returnType, List<(string name, string type)> parameters)> _functions =
-            new Dictionary<string, (string, List<(string, string)>)>();
-
-        // Текущий контекст (для проверки внутри функций)
-        private string _currentFunction = null;
-
-        /// <summary>
-        /// Добавляет переменную в таблицу символов
-        /// </summary>
-        public void AddVariable(string id, string type)
+        private readonly InputReader _reader;
+        private readonly SemanticAnalyzer _semanticAnalyzer; // Добавляем поле
+        public int _currentLine = 1; // Добавляем отслеживание строки
+        public readonly Stack<(char, int)> _bracketStack = new Stack<(char, int)>();
+        private void ThrowError(int code, params object[] args)
         {
-            if (_symbols.ContainsKey(id))
-            {
-                Errors.Add($"Строка {_lexer._currentLine}: Переменная '{id}' уже объявлена");
-                return;
-            }
-            _symbols[id] = (type, false);
+            string message = $"Строка {_currentLine}: Ошибка {code}: {string.Format(ErrorCodes[code], args)}";
+            Errors.Add(message); // Добавляем ошибку в список
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(message); // Выводим сразу (опционально)
+            Console.ResetColor();
+        }
+        public static readonly Dictionary<int, string> ErrorCodes = new Dictionary<int, string>
+        {
+            {100, "Отсутствует ;"},
+            {101, "Отсутствует . после end"},
+            {102, "Неверный тип данных"},
+            {103, "Неизвестный символ: {0}"},
+            {104, "Ожидалось {0}, но получено {1}"},
+            {105, "Неизвестный оператор"},
+            {106, "Переменная '{0}' не объявлена"},
+            {107, "Отсутствует begin"},
+            {108, "Отсутствует end"},
+            {109, "Отсутствует :="},
+            {110, "Отсутствует '('"},
+            {111, "Отсутствует ')'"},
+            {112, "Несоответствие типов"},
+            {113, "Дублирование идентификатора '{0}'"},
+            {114, "Выход за границы массива"},
+            {115, "Неверное количество параметров"},
+            {116, "Незакрытая скобка: {0}"},
+            {117, "Незакрытая кавычка"},
+            {118, "Недопустимый символ: {0}"},
+            {119, "Целое число {0} вне допустимого диапазона [-32768, 32767]"},
+            {120, "Вещественное число {0} вне допустимого диапазона"}
+            // ... добавь остальные из твоего списка
+        };
+        public static readonly Dictionary<string, int> TokenCodes = new()
+        {
+            // Специальные символы и операторы
+            { "*", 21 },
+            { "/", 60 },
+            { "=", 16 },
+            { ",", 20 },
+            { ";", 14 },
+            { ":", 5 },
+            { ".", 61 },
+            { "^", 62 },
+            { "(", 9 },
+            { ")", 4 },
+            { "[", 11 },
+            { "]", 12 },
+            { "{", 63 },
+            { "}", 64 },
+            { "<", 65 },
+            { ">", 66 },
+            { "<=", 67 },
+            { ">=", 68 },
+            { "<>", 69 },
+            { "+", 70 },
+            { "-", 71 },
+            { "(*", 72 },
+            { "*)", 73 },
+            { ":=", 51 },
+            { "..", 74 },
+
+            // Ключевые слова (в нижнем регистре)
+            { "case", 31 },
+            { "else", 32 },
+            { "file", 57 },
+            { "goto", 33 },
+            { "then", 52 },
+            { "type", 34 },
+            { "until", 53 },
+            { "do", 54 },
+            { "with", 37 },
+            { "if", 56 },
+            { "in", 100 },
+            { "of", 101 },
+            { "or", 102 },
+            { "to", 103 },
+            { "end", 104 },
+            { "var", 105 },
+            { "div", 106 },
+            { "and", 107 },
+            { "not", 108 },
+            { "for", 109 },
+            { "mod", 110 },
+            { "nil", 111 },
+            { "set", 112 },
+            { "begin", 113 },
+            { "while", 114 },
+            { "array", 115 },
+            { "const", 116 },
+            { "label", 117 },
+            { "downto", 118 },
+            { "packed", 119 },
+            { "record", 120 },
+            { "repeat", 121 },
+            { "program", 122 },
+            { "function", 123 },
+            { "procedure", 124 },
+
+            // Константы (псевдотокены)
+            { "ident", 2 },
+            { "floatc", 82 },
+            { "intc", 15 }
+        };
+        public static string GetAllTokenCodes()
+        {
+            return string.Join(" ", TokenCodes.Values.OrderBy(code => code));
+        }
+        public int GetTokenCode(string lexeme)
+        {
+            return TokenCodes.TryGetValue(lexeme.ToLower(), out int code)
+                ? code
+                : TokenCodes["ident"]; // По умолчанию идентификатор (код 2)
         }
 
-        /// <summary>
-        /// Добавляет функцию в таблицу символов
-        /// </summary>
-        public void AddFunction(string id, string returnType, List<(string name, string type)> parameters)
-        {
-            if (_symbols.ContainsKey(id))
-            {
-                Errors.Add($"Строка {_lexer._currentLine}: Идентификатор '{id}' уже используется");
-                return;
-            }
 
-            _symbols[id] = (returnType, true);
-            _functions[id] = (returnType, parameters);
+        public Lexer(InputReader reader)
+        {
+            _reader = reader;
+            _semanticAnalyzer = new SemanticAnalyzer(); // Инициализируем анализатор
+            _bracketStack = new Stack<(char, int)>(); // Инициализация стека
         }
 
-        /// <summary>
-        /// Проверяет правильность присваивания
-        /// </summary>
-        public void ValidateAssignment(string id, string expressionType)
+
+        public Token NextToken()
         {
-            if (!_symbols.TryGetValue(id, out var symbol))
+            while (char.IsWhiteSpace(_reader.Peek()))
             {
-                Errors.Add($"Строка {_lexer._currentLine}: Переменная '{id}' не объявлена");
-                return;
+                if (_reader.NextChar() == '\n') _currentLine++;
+                
             }
 
-            if (symbol.isFunction)
+            char c = _reader.Peek();
+            if (c == '\0') return new Token(TokenType.EOF, "", 0);
+
+            // Проверка на недопустимые символы
+            if (c == '@' || c == '$' || c == '&' || c == '?')
             {
-                Errors.Add($"Строка {_lexer._currentLine}: '{id}' является функцией, а не переменной");
-                return;
+                _reader.NextChar();
+                ThrowError(118, c.ToString());
+                return new Token(TokenType.UNKNOWN, c.ToString());
             }
 
-            // Проверка совместимости типов
-            if (symbol.type != expressionType && !(symbol.type == "real" && expressionType == "integer"))
+            // Обработка скобок и кавычек
+            if (c == '(' || c == '[' || c == '{')
             {
-                Errors.Add($"Строка {_lexer._currentLine}: Несоответствие типов. Нельзя присвоить {expressionType} переменной типа {symbol.type}");
+                _bracketStack.Push((c, _currentLine));
             }
-        }
-
-        /// <summary>
-        /// Проверяет вызов функции
-        /// </summary>
-        public string ValidateFunctionCall(string id, List<string> argumentTypes)
-        {
-            if (!_functions.TryGetValue(id, out var function))
+            else if (c == ')' || c == ']' || c == '}')
             {
-                Errors.Add($"Строка {_lexer._currentLine}: Функция '{id}' не объявлена");
-                return "unknown";
-            }
-
-            if (function.parameters.Count != argumentTypes.Count)
-            {
-                Errors.Add($"Строка {_lexer._currentLine}: Неверное количество аргументов. Ожидалось {function.parameters.Count}, получено {argumentTypes.Count}");
-                return function.returnType;
-            }
-
-            // Проверка типов аргументов
-            for (int i = 0; i < function.parameters.Count; i++)
-            {
-                var param = function.parameters[i];
-                var argType = argumentTypes[i];
-
-                if (param.type != argType && !(param.type == "real" && argType == "integer"))
+                if (_bracketStack.Count == 0)
                 {
-                    Errors.Add($"Строка {_lexer._currentLine}: Несоответствие типа аргумента {i + 1}. Ожидался {param.type}, получен {argType}");
+                    ThrowError(116, $"Лишняя закрывающая скобка: {c}");
+                }
+                else
+                {
+                    var (opening, line) = _bracketStack.Pop();
+                    if ((opening == '(' && c != ')') ||
+                        (opening == '[' && c != ']') ||
+                        (opening == '{' && c != '}'))
+                    {
+                        ThrowError(116, $"Несоответствие скобок: ожидалось {GetClosingBracket(opening)}, но получено {c}");
+                    }
+                }
+            }
+            else if (c == '\'')
+            {
+                // Обработка кавычек
+                _reader.NextChar(); // Пропускаем открывающую кавычку
+                bool closed = false;
+                while (_reader.Peek() != '\0')
+                {
+                    if (_reader.Peek() == '\'')
+                    {
+                        _reader.NextChar();
+                        closed = true;
+                        break;
+                    }
+                    _reader.NextChar();
+                }
+                if (!closed)
+                {
+                    ThrowError(117);
+                }
+                return NextToken(); // Пропускаем содержимое кавычек
+            }
+
+            // Пропускаем пробельные символы и считаем строки
+            while (char.IsWhiteSpace(_reader.Peek()))
+            {
+                if (_reader.NextChar() == '\n')
+                {
+                    _currentLine++;
+                }
+            }
+            while (char.IsWhiteSpace(_reader.Peek()))
+                _reader.NextChar();
+
+
+            if (c == '\0') return new Token(TokenType.EOF, "", 0);
+            if (c == '.' && !char.IsDigit(_reader.PeekNext()))
+            {
+                _reader.NextChar(); // Пропускаем точку
+                return new Token(TokenType.OPERATOR, ".", TokenCodes["."]);
+            }
+            // 1. Если буква — IDENT или KEYWORD
+            if (char.IsLetter(c))
+            {
+                string word = "";
+                while (char.IsLetterOrDigit(_reader.Peek()))
+                    word += _reader.NextChar();
+
+                int code = GetTokenCode(word);
+                return new Token(code == 2 ? TokenType.IDENT : TokenType.KEYWORD, word, code);
+            }
+
+
+
+
+            // Обработка чисел
+            if (char.IsDigit(c) || c == '.')
+            {
+                string numStr = ReadNumber();
+
+                if (numStr.Contains('.') || numStr.Contains('e') || numStr.Contains('E'))
+                {
+                    if (!double.TryParse(numStr, NumberStyles.Any, CultureInfo.InvariantCulture, out double realValue))
+                    {
+                        ThrowError(102, $"Некорректное вещественное число: {numStr}");
+                    }
+                    else if (!IsRealInRange(realValue))
+                    {
+                        ThrowError(120, numStr);
+                    }
+                    return new Token(TokenType.NUMBER, numStr, TokenCodes["floatc"]);
+                }
+                else
+                {
+                    if (!long.TryParse(numStr, out long intValue))
+                    {
+                        ThrowError(102, $"Слишком большое целое число: {numStr}");
+                    }
+                    if (!IsIntegerInRange(intValue))
+                    {
+                        ThrowError(119, numStr); // Используем новый код ошибки
+                    }
+                    return new Token(TokenType.NUMBER, numStr, TokenCodes["intc"]);
                 }
             }
 
-            return function.returnType;
-        }
-
-        /// <summary>
-        /// Проверяет тип выражения
-        /// </summary>
-        public string ValidateExpression(Token op, string leftType, string rightType)
-        {
-            // Для арифметических операторов
-            if (new[] { "+", "-", "*", "/" }.Contains(op.Value))
+            // 3. Если символ — OPERATOR/PUNCT
+            string op = _reader.NextChar().ToString();
+            if (TokenCodes.ContainsKey(op + _reader.Peek()))
             {
-                if (leftType == "integer" && rightType == "integer")
-                    return "integer";
+                op += _reader.NextChar();
+            }
+            return new Token(TokenType.OPERATOR, op, GetTokenCode(op));
 
-                if ((leftType == "real" || rightType == "real") &&
-                    (leftType != "unknown" && rightType != "unknown"))
-                    return "real";
 
-                Errors.Add($"Строка {_lexer._currentLine}: Несовместимые типы для оператора {op.Value}: {leftType} и {rightType}");
-                return "unknown";
+
+
+
+
+        }
+        private string ReadNumber()
+        {
+            string number = "";
+            char c = _reader.Peek();
+
+            // Читаем целую часть
+            while (char.IsDigit(c))
+            {
+                number += _reader.NextChar();
+                c = _reader.Peek();
             }
 
-            // Для операторов сравнения
-            if (new[] { "<", ">", "<=", ">=", "=", "<>" }.Contains(op.Value))
+            // Проверяем на вещественное число
+            if (c == '.')
             {
-                if ((leftType == rightType) ||
-                    (leftType == "integer" && rightType == "real") ||
-                    (leftType == "real" && rightType == "integer"))
-                    return "boolean";
+                number += _reader.NextChar(); // Добавляем точку
+                c = _reader.Peek();
 
-                Errors.Add($"Строка {_lexer._currentLine}: Нельзя сравнивать {leftType} и {rightType}");
-                return "unknown";
+                // Читаем дробную часть
+                while (char.IsDigit(c))
+                {
+                    number += _reader.NextChar();
+                    c = _reader.Peek();
+                }
             }
 
-            return "unknown";
+            // Проверяем на экспоненциальную запись
+            if (c == 'e' || c == 'E')
+            {
+                number += _reader.NextChar(); // Добавляем 'e' или 'E'
+                c = _reader.Peek();
+
+                // Проверяем на знак
+                if (c == '+' || c == '-')
+                {
+                    number += _reader.NextChar();
+                    c = _reader.Peek();
+                }
+
+                // Читаем экспоненту
+                while (char.IsDigit(c))
+                {
+                    number += _reader.NextChar();
+                    c = _reader.Peek();
+                }
+            }
+
+            return number;
+        }
+        private char GetClosingBracket(char opening)
+        {
+            return opening switch
+            {
+                '(' => ')',
+                '[' => ']',
+                '{' => '}',
+                _ => throw new ArgumentException("Неизвестная скобка")
+            };
+        }
+        private bool IsIntegerInRange(long value)
+        {
+            return value >= -32768 && value <= 32767;
         }
 
-        /// <summary>
-        /// Проверяет, существует ли идентификатор
-        /// </summary>
-        public bool IdentifierExists(string id)
+        private bool IsRealInRange(double value)
         {
-            return _symbols.ContainsKey(id);
+            return !double.IsInfinity(value);
         }
-
-        /// <summary>
-        /// Получает тип идентификатора
-        /// </summary>
-        public string GetIdentifierType(string id)
-        {
-            return _symbols.TryGetValue(id, out var symbol) ? symbol.type : "unknown";
-        }
-
-        /// <summary>
-        /// Входит в контекст функции
-        /// </summary>
-        public void EnterFunctionContext(string functionName)
-        {
-            _currentFunction = functionName;
-        }
-
-        /// <summary>
-        /// Выходит из контекста функции
-        /// </summary>
-        public void ExitFunctionContext()
-        {
-            _currentFunction = null;
-        }
+    }
+}
     }
 }
