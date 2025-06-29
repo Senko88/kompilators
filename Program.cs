@@ -25,34 +25,29 @@ namespace kompilator
                 Console.WriteLine("=== Исходный код ===");
                 Console.WriteLine(sourceCode);
 
-                // Инициализация
-                var reader = new InputReader("program.pas"); // Ваш вариант InputReader
-                var lexer = new Lexer(reader, null); // Lexer с передачей парсера
-                var parser = new Parser(lexer); // Ваш вариант Parser
-                lexer.SetParser(parser); // Ваш метод для обратной связи
-
-                // Парсинг
+                var lexer = new Lexer(new InputReader(sourceCode));
+                var parser = new Parser(lexer); // Передаём в парсер
                 parser.ParseProgram();
 
-                // Сбор ВСЕХ ошибок (лексические + синтаксические/семантические)
-                var allErrors = parser.AllErrors.Distinct().ToList(); // Удаляем повторы
+                // Собираем ошибки из всех источников
+                var allErrors = new List<string>();
+                allErrors.AddRange(lexer.Errors);
+                allErrors.AddRange(parser.Errors);
 
-                // Вывод
+                // Вывод ошибок
                 if (allErrors.Count > 0)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("\n=== ВСЕ ОШИБКИ ===");
-                    foreach (var error in allErrors) Console.WriteLine(error);
-                    Console.WriteLine($"\nВсего: {allErrors.Count} ошибок");
+                    Console.WriteLine("\n=== НАЙДЕНЫ ОШИБКИ ===");
+                        Console.WriteLine($"\nВсего ошибок: {allErrors.Count}");
                     Console.ResetColor();
                 
                 ShowError("В программе ошибки!!!");
                     Console.WriteLine("\n=== Ключевые слова компилятора ===");
                     PrintKeyWords();
 
-                    var parser2 = new Parser(lexer);
-                    parser2.ParseProgram();
-                    PrintTokens(sourceCode,parser2);
+
+                    PrintTokens(sourceCode);
                 }
                 else
                 {
@@ -60,9 +55,7 @@ namespace kompilator
                     Console.WriteLine("\n=== Ключевые слова компилятора ===");
                     PrintKeyWords();
 
-                    var parser3 = new Parser(lexer);
-                    parser3.ParseProgram();
-                    PrintTokens(sourceCode,parser3);
+                    PrintTokens(sourceCode);
                 }
 
                 
@@ -97,15 +90,15 @@ namespace kompilator
         }
 
 
-        private static void PrintTokens(string code, Parser parser)
+        private static void PrintTokens(string code)
         {
             Console.WriteLine("\nТокены:");
-            var lexer = new Lexer(new InputReader(code),parser);
+            var lexer = new Lexer(new InputReader(code));
             Token token;
             do
             {
                 token = lexer.NextToken();
-                Console.WriteLine($"{token.Type}: {token.Value}");
+                Console.WriteLine($"[Строка {lexer._currentLine}] {token.Type}: {token.Value}");
             } while (token.Type != TokenType.EOF);
         }
     }
